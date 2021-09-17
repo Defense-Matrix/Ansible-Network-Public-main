@@ -1,0 +1,36 @@
+# This playbook checks if port 22 is open via a python script; if it is not then the script attempts to enable ssh through telnet commands.
+
+---
+- name: enable ssh
+  hosts: 10.1.1.1
+  gather_facts: false
+  connection: local
+
+  tasks:
+
+      - name: check ssh
+        command:  /usr/bin/python3 /etc/ansible/playbooks/check_port.py "{{ansible_host}}"  22
+        register: stdout_lines
+        ignore_errors: True
+
+
+      - name: enable_ssh
+        when: stdout_lines is search('fail')
+        telnet:
+          user: admin
+          password: REDACTED
+          login_prompt: "Username: "
+          prompts:
+            - "[>|#]"
+          command:
+            - term le 0
+            - conf t
+            - ip domain-name network.home.com
+            - crypto key generate rsa modulus 2048
+            - ip ssh version 2
+            - exit
+            - wr mem
+            - exit
+        register: stdout
+        failed_when: stdout is search('Invalid input detected')
+        

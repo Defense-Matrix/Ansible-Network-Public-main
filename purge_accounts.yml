@@ -1,0 +1,31 @@
+# This script removes all user accounts on the device except admin1, admin2, and admin3.
+# Useful if you need to make sure only certain accounts are on a Cisco device.
+
+---
+- hosts: 10.100.100.1
+  gather_facts: false
+  tasks:
+
+
+  - name: Check for admin1
+    cisco.ios.ios_command:
+      commands:
+      - show run | include admin1
+    register: stdout
+
+
+  - name: remove all users except admin1 and these listed users (this task will skip if admin1 is not in the config)
+    when: stdout is search('admin1')
+    cisco.ios.ios_user:
+      aggregate:
+      - name: admin1
+      - name: admin2
+      - name: admin3
+      purge: yes
+
+
+  - name: copy run start
+    cisco.ios.ios_config:
+      save_when: modified
+    tags:
+      - save

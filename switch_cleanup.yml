@@ -1,0 +1,90 @@
+---
+- hosts: home
+  gather_facts: false
+  tasks:
+
+
+  - name: Remove old Orion logging
+    cisco.ios.ios_logging:
+      dest: host
+      name: 10.10.10.10
+      state: absent
+    tags:
+      - nologging
+
+
+  - name: Replace syslog
+    ios_config:
+      lines:
+        - logging buffered 16384
+        - logging trap debugging
+        - logging host 10.10.10.11 transport udp port 9514
+        - logging host 10.10.10.12
+    ignore_errors: True
+    tags:
+      - logging
+
+
+  - name: Remove non-standard configuration (this task will always make changes even if its not required)
+    ios_config:
+      lines:
+        - no ip domain-name gmail.com
+        - no ntp server 10.10.10.13
+        - no ntp server 10.10.10.14
+        - no snmp-server host 10.10.10.10 REDACTED
+        - no snmp-server community REDACTED RW snmp
+        - no snmp-server community REDACTED RO snmp
+        - no snmp-server community REDACTED RO snmp
+        - no snmp-server community REDACTED RW snmp
+        - no snmp-server community REDACTED RO
+        - no snmp-server community REDACTED RW
+        - no snmp-server host 10.10.10.10 REDACTED
+        - no snmp-server host 10.10.10.10 REDACTED
+        - no ip name-server 10.10.10.10
+        - no ip name-server 10.10.10.10
+    ignore_errors: True
+    when: ansible_network_os == 'ios'
+    tags:
+      - remove
+
+
+  - name: Change NTP to new standard
+    block:
+      - name: Add new DNS and domain name
+        ios_config:
+          lines:
+            - ip name-server 10.10.10.10
+            - ip name-server 10.10.10.10
+            - ip domain-name network.linux.com
+    rescue:
+      - name: Rescue if error adding doamin name
+        ios_config:
+          lines:
+            - ip domain name network.linux.com
+    tags:
+      - ipdomain
+
+
+  - name: Change NTP to new standard
+    block:
+      - name: Add new NTP
+        ios_config:
+          lines:
+            - ntp server ntp1.network.linux.com prefer
+            - ntp server ntp2.network.linux.com
+            - ntp server ntp3.network.linux.com
+    rescue:
+      - name: Rescue if error applying NTP
+        ios_config:
+          lines:
+            - ntp server 10.10.10.10
+            - ntp server 10.10.10.10
+    tags:
+      - ntp
+
+
+  - name: copy run start
+    cisco.ios.ios_config:
+      save_when: always
+    tags:
+      - save

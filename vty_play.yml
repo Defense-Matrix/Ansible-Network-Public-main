@@ -1,0 +1,37 @@
+# This script changes the vty lines to be more secure
+
+---
+- hosts: cisco
+  gather_facts: false
+  tasks:
+
+  - name: Get current vty config
+    cisco.ios.ios_command:
+      commands:
+        - show run | inc line vty
+    register: get_vty_info
+
+  - name: Standardize vty lines
+    block:
+      - name: Standardize vty lines
+        with_items: "{{ get_vty_info.stdout_lines[0] | map('trim') | list }}"
+        cisco.ios.ios_config:
+          parents: "{{ item }}"
+          lines:
+            - "exec-timeout 60 0"
+            - "logging synchronous"
+            - "transport input ssh"
+
+      - name: Set ssh options
+        ios_config:
+          lines:
+            - ip ssh time-out 30
+            - ip ssh version 2
+          before: ip ssh authentication-retries 3
+
+    always:
+      - name: copy run start
+        cisco.ios.ios_config:
+          save_when: always
+        tags:
+          - save
