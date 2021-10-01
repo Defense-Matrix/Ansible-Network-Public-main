@@ -1,0 +1,71 @@
+# This script changes the Radius and AAA to be more secure.
+
+---
+- hosts: Cisco_remedation_Switches
+  gather_facts: false
+  tasks:
+
+  - name: Fail playbook on unreachable, telnet, and IOS version 12 nodes
+    cisco.ios.ios_facts:
+      gather_subset: min
+    register: stdout
+    failed_when: stdout is search('Error reading SSH') or ansible_net_version is search('12')
+    tags:
+      - version
+
+  - name: Radius server group
+    ios_config:
+      parents: aaa group server radius LINODE
+      lines:
+        - server name LINODE1
+        - server name LINODE2
+      before: aaa new-model
+      after:
+        - no radius-server host 10.10.10.10 auth-port 1816 acct-port 1823
+        - no radius-server host 10.10.10.11 auth-port 1816 acct-port 1823
+        - no radius-server key 7
+    failed_when: false
+
+  - name: Change to new Radius Method and AAA
+    block:
+      - name: Radius server LINODE1
+        ios_config:
+          parents: radius server LINODE1
+          lines:
+            - address ipv4 10.10.10.10 auth-port 1816 acct-port 1823
+            - key 0 19191280101
+          replace: block
+          save_when: changed
+
+      - name: Radius server LINODE2
+        ios_config:
+          parents: radius server LINODE2
+          lines:
+            - address ipv4 10.10.10.11 auth-port 1816 acct-port 1823
+            - key 0 19191280101
+          replace: block
+          save_when: changed
+
+      - name: New aaa configuration
+        ios_config:
+          lines:
+            - aaa authentication login default group LINODE local
+            - aaa authorization console
+            - aaa authorization exec default group LINODE local if-authenticated
+            - aaa accounting exec default start-stop group LINODE
+            - aaa accounting connection default start-stop group LINODE
+            - aaa session-id common
+          save_when: changed
+
+    rescue:
+      - name: Revert to old Radius standard
+        ios_config:
+          lines:
+            - radius-server host 10.10.10.10 auth-port 1816 acct-port 1823
+            - radius-server host 10.10.10.11 auth-port 1816 acct-port 1823
+            - radius-server key 0 19191280101
+            - aaa authentication login default group radius local enable
+            - aaa authorization console
+            - aaa authorization exec default group radius local
+            - aaa accounting exec default start-stop group radius
+            - no aaa accounting connection default start-stop group LINODE

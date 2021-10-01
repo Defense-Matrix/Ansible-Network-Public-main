@@ -1,0 +1,19 @@
+---
+
+- name: Cisco Archive Settings
+  hosts: Cisco:children
+  strategy: free
+  gather_facts: false
+  tasks:
+
+  - name: Set archive options
+    ios_config:
+      lines:
+        - logging enable
+        - logging size 500
+        - hidekeys
+      parents:
+        - archive
+        - log config
+      replace: line
+      save_when: changed
