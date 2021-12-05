@@ -33,4 +33,3 @@
             - exit
         register: stdout
         failed_when: stdout is search('Invalid input detected')
-        
